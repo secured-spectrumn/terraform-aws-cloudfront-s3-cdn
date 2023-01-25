@@ -18,7 +18,7 @@ jobs:
           head: master
 
       - name: Sync from upstream to fork
-        uses: chachako/tags-sync@v1
+        uses: chachako/tags-sync@c82db2f78e9f713cc18727cdcc8864c9de8fbaa9
         with:
           base-repository: cloudposse/terraform-aws-cloudfront-s3-cdn
 
