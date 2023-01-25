@@ -16,3 +16,9 @@ jobs:
           token: ${{ secrets.FINE_GRAIN_TOKEN }}
           base: master
           head: master
+
+      - name: Sync from upstream to fork
+        uses: chachako/tags-sync@v1
+        with:
+          base-repository: cloudposse/terraform-aws-cloudfront-s3-cdn
+
