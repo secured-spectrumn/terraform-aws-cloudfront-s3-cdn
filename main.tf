@@ -55,6 +55,21 @@ locals {
   use_default_acm_certificate = var.acm_certificate_arn == ""
   minimum_protocol_version    = var.minimum_protocol_version == "" ? (local.use_default_acm_certificate ? "TLSv1" : "TLSv1.2_2019") : var.minimum_protocol_version
 
+  website_config = {
+    redirect_all = [
+      {
+        redirect_all_requests_to = var.redirect_all_requests_to
+      }
+    ]
+    default = [
+      {
+        index_document = var.index_document
+        error_document = var.error_document
+        routing_rules  = var.routing_rules
+      }
+    ]
+  }
+
   # Based on https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html#choose-origin-shield-region
   # If a region is not specified, we assume it supports Origin Shield.
   origin_shield_region_fallback_map = {
@@ -239,51 +254,19 @@ resource "aws_s3_bucket" "origin" {
   count = local.create_s3_origin_bucket ? 1 : 0
 
   bucket        = module.origin_label.id
+  acl           = "private"
   tags          = module.origin_label.tags
   force_destroy = var.origin_force_destroy
-}
 
-resource "aws_s3_bucket_acl" "origin" {
-  count  = local.create_s3_origin_bucket ? 1 : 0
-  bucket = aws_s3_bucket.origin[0].id
-  acl    = "private"
-}
+  dynamic "server_side_encryption_configuration" {
+    for_each = var.encryption_enabled ? ["true"] : []
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "origin" {
-  count  = local.create_s3_origin_bucket && var.encryption_enabled ? 1 : 0
-  bucket = aws_s3_bucket.origin[0].id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_versioning" "origin" {
-  count  = local.create_s3_origin_bucket ? 1 : 0
-  bucket = aws_s3_bucket.origin[0].id
-
-  versioning_configuration {
-    status = var.versioning_enabled ? "Enabled" : "Disabled"
-  }
-}
-
-resource "aws_s3_bucket_logging" "origin" {
-  count         = local.create_s3_origin_bucket && local.s3_access_log_bucket_name != "" ? 1 : 0
-  bucket        = aws_s3_bucket.origin[0].id
-  target_bucket = local.s3_access_log_bucket_name
-  target_prefix = coalesce(var.s3_access_log_prefix, "logs/${local.origin_id}/")
-}
-
-resource "aws_s3_bucket_website_configuration" "origin" {
-  count  = (local.create_s3_origin_bucket && var.website_enabled) ? 1 : 0
-  bucket = aws_s3_bucket.origin[0].id
-
-  dynamic "error_document" {
-    for_each = var.redirect_all_requests_to == "" ? [1] : []
     content {
-      key = var.error_document
+      rule {
+        apply_server_side_encryption_by_default {
+          sse_algorithm = "AES256"
+        }
+      }
     }
   }
 
@@ -294,32 +277,30 @@ resource "aws_s3_bucket_website_configuration" "origin" {
   dynamic "logging" {
     for_each = local.s3_access_logging_enabled ? [1] : []
     content {
-      suffix = var.index_document
+      target_bucket = local.s3_access_log_bucket_name
+      target_prefix = coalesce(var.s3_access_log_prefix, "logs/${local.origin_id}/")
     }
   }
 
-  routing_rules = var.redirect_all_requests_to == "" ? var.routing_rules : null
-
-  // Conflicts with error_document, index_document, routing_rules
-  //noinspection ConflictingProperties
-  dynamic "redirect_all_requests_to" {
-    for_each = var.redirect_all_requests_to != "" ? [1] : []
+  dynamic "website" {
+    for_each = var.website_enabled ? local.website_config[var.redirect_all_requests_to == "" ? "default" : "redirect_all"] : []
     content {
-      host_name = var.redirect_all_requests_to
+      error_document           = lookup(website.value, "error_document", null)
+      index_document           = lookup(website.value, "index_document", null)
+      redirect_all_requests_to = lookup(website.value, "redirect_all_requests_to", null)
+      routing_rules            = lookup(website.value, "routing_rules", null)
     }
   }
-}
 
-resource "aws_s3_bucket_cors_configuration" "origin" {
-  count  = !local.create_s3_origin_bucket && length(distinct(compact(concat(var.cors_allowed_origins, var.aliases, var.external_aliases)))) == 0 ? 0 : 1
-  bucket = aws_s3_bucket.origin[0].id
-
-  cors_rule {
-    allowed_headers = var.cors_allowed_headers
-    allowed_methods = var.cors_allowed_methods
-    allowed_origins = distinct(compact(concat(var.cors_allowed_origins, var.aliases, var.external_aliases)))
-    expose_headers  = var.cors_expose_headers
-    max_age_seconds = var.cors_max_age_seconds
+  dynamic "cors_rule" {
+    for_each = distinct(compact(concat(var.cors_allowed_origins, var.aliases, var.external_aliases)))
+    content {
+      allowed_headers = var.cors_allowed_headers
+      allowed_methods = var.cors_allowed_methods
+      allowed_origins = [cors_rule.value]
+      expose_headers  = var.cors_expose_headers
+      max_age_seconds = var.cors_max_age_seconds
+    }
   }
 }
 
