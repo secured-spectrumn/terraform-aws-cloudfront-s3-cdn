@@ -254,9 +254,14 @@ resource "aws_s3_bucket" "origin" {
   count = local.create_s3_origin_bucket ? 1 : 0
 
   bucket        = module.origin_label.id
-  acl           = "private"
   tags          = module.origin_label.tags
   force_destroy = var.origin_force_destroy
+}
+
+resource "aws_s3_bucket_acl" "origin" {
+  count  = local.create_s3_origin_bucket ? 1 : 0
+  bucket = aws_s3_bucket.origin[0].id
+  acl    = "private"
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "origin" {
