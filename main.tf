@@ -258,18 +258,6 @@ resource "aws_s3_bucket" "origin" {
   tags          = module.origin_label.tags
   force_destroy = var.origin_force_destroy
 
-  dynamic "server_side_encryption_configuration" {
-    for_each = var.encryption_enabled ? ["true"] : []
-
-    content {
-      rule {
-        apply_server_side_encryption_by_default {
-          sse_algorithm = "AES256"
-        }
-      }
-    }
-  }
-
   versioning {
     enabled = var.versioning_enabled
   }
@@ -300,6 +288,18 @@ resource "aws_s3_bucket" "origin" {
       allowed_origins = [cors_rule.value]
       expose_headers  = var.cors_expose_headers
       max_age_seconds = var.cors_max_age_seconds
+    }
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "origin" {
+  count = local.create_s3_origin_bucket ? 1 : 0
+  
+  bucket = module.origin_label.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "AES256"
     }
   }
 }
