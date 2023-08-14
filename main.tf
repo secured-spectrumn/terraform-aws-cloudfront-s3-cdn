@@ -287,17 +287,12 @@ resource "aws_s3_bucket_website_configuration" "origin" {
     }
   }
 
-<<<<<<< HEAD
-  dynamic "index_document" {
-    for_each = var.redirect_all_requests_to == "" ? [1] : []
-=======
   versioning {
     enabled = var.versioning_enabled
   }
 
   dynamic "logging" {
     for_each = local.s3_access_logging_enabled ? [1] : []
->>>>>>> 91ab13116a84072ce66a0304dd770733b58f496f
     content {
       suffix = var.index_document
     }
@@ -369,11 +364,7 @@ resource "time_sleep" "wait_for_aws_s3_bucket_settings" {
 
 module "logs" {
   source                   = "cloudposse/s3-log-storage/aws"
-<<<<<<< HEAD
-  version                  = "1.0.0"
-=======
   version                  = "1.4.2"
->>>>>>> 91ab13116a84072ce66a0304dd770733b58f496f
   enabled                  = local.create_cf_log_bucket
   attributes               = var.extra_logs_attributes
   allow_ssl_requests_only  = true
