@@ -305,7 +305,7 @@ resource "aws_s3_bucket_versioning" "origin" {
 
   bucket = module.origin_label.id
   versioning_configuration {
-    status = var.versioning_enabled
+    status = var.versioning_enabled ? "Enabled" : "Disabled"
   }
 }
 
